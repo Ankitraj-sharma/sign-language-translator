@@ -128,3 +128,52 @@ class GestureClassifier:
                 raw_gesture = "YES"
                 conf = 0.93
             elif thumb_tip[1] > wrist[1] + 0.05:  # thumb pointing downwards
+                raw_gesture = "NO"
+                conf = 0.92
+            else:
+                raw_gesture = "ONE (1)"
+                conf = 0.82
+
+        # 7. POINT / YOU / ONE: Only Index extended
+        elif not thumb and index and not middle and not ring and not pinky:
+            raw_gesture = "ONE (1)"
+            conf = 0.90
+
+        # 8. THREE (3): Thumb, Index, Middle extended
+        elif thumb and index and middle and not ring and not pinky:
+            raw_gesture = "THREE (3)"
+            conf = 0.91
+
+        # 9. FOUR (4): 4 fingers extended, thumb curled
+        elif not thumb and index and middle and ring and pinky:
+            raw_gesture = "FOUR (4)"
+            conf = 0.93
+
+        # 10. ALL 5 EXTENDED: HELLO or STOP or FIVE (5)
+        elif thumb and index and middle and ring and pinky:
+            # If fingers are spread out -> HELLO
+            if norm_index_middle_dist > 0.30:
+                raw_gesture = "HELLO"
+                conf = 0.95
+            else:
+                raw_gesture = "STOP"
+                conf = 0.92
+
+        # 11. TIGHT FIST / ZERO (0) / HELP
+        elif not thumb and not index and not middle and not ring and not pinky:
+            raw_gesture = "FIST / ZERO (0)"
+            conf = 0.90
+
+        # Push to temporal buffer for stabilization
+        self.history.append(raw_gesture)
+
+        # Most frequent gesture in sliding window
+        counts = {}
+        for g in self.history:
+            counts[g] = counts.get(g, 0) + 1
+
+        stable_gesture = max(counts, key=counts.get)
+        stability_ratio = counts[stable_gesture] / len(self.history)
+        final_conf = min(0.99, round(conf * (0.7 + 0.3 * stability_ratio), 2))
+
+        return stable_gesture, final_conf
