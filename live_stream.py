@@ -118,3 +118,62 @@ class LiveSignProcessor(VideoProcessorBase):
         conf: float,
         states: dict[str, bool],
         w: int,
+        h: int,
+    ) -> None:
+        """Render high-tech augmented reality overlay on the video feed."""
+        # Top translucent status bar
+        overlay = img.copy()
+        cv2.rectangle(overlay, (0, 0), (w, 75), (10, 14, 23), -1)
+        cv2.addWeighted(overlay, 0.75, img, 0.25, 0, img)
+
+        # Neon divider line
+        cv2.line(img, (0, 75), (w, 75), (0, 210, 186), 2)
+
+        # Active Sign Label
+        color = (0, 210, 186) if sign not in ("NO HAND DETECTED", "UNKNOWN") else (150, 150, 150)
+        display_text = f"SIGN: {sign}"
+        if conf > 0:
+            display_text += f" ({int(conf * 100)}%)"
+
+        cv2.putText(
+            img,
+            display_text,
+            (20, 48),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+
+        # FPS meter on top right
+        fps_text = f"{self.fps} FPS"
+        cv2.putText(
+            img,
+            fps_text,
+            (w - 130, 48),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.75,
+            (0, 165, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+        # Progress bar for sign hold / debouncing (bottom of top bar)
+        if self._hold_counter > 0 and self._hold_counter <= self.hold_threshold:
+            progress = min(1.0, self._hold_counter / self.hold_threshold)
+            bar_w = int(w * progress)
+            cv2.rectangle(img, (0, 72), (bar_w, 75), (0, 255, 128), -1)
+
+    def get_telemetry(self) -> dict:
+        """Thread-safe retrieval of latest pipeline metrics."""
+        with self._lock:
+            committed = self.newly_committed_sign
+            self.newly_committed_sign = None  # consume single-shot event
+            return {
+                "sign": self.latest_sign,
+                "confidence": self.latest_confidence,
+                "fps": self.fps,
+                "finger_states": dict(self.finger_states),
+                "committed_sign": committed,
+            }
