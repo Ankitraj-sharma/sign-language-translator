@@ -463,3 +463,94 @@ with tab_analytics:
     st.markdown("### 📊 Translation Session Analytics")
     st.caption("Aggregated frequency and confidence telemetry across this interactive session.")
 
+    history = st.session_state.session_history
+    if not history:
+        st.info("No translation events recorded yet. Start the live webcam or analyze photos to view session charts!")
+    else:
+        stats = session_metrics(history)
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Signs Recognized", stats["total_translations"])
+        m2.metric("Unique Signs Used", stats["unique_signs"])
+        m3.metric("Average Confidence", f"{stats['avg_confidence']}%")
+        m4.metric("Top Sign", stats["top_sign"])
+
+        st.markdown("---")
+
+        c_chart1, c_chart2 = st.columns([1.5, 1.0])
+        with c_chart1:
+            signs_list = [h["sign"] for h in history]
+            st.plotly_chart(sign_frequency_chart(signs_list), use_container_width=True)
+
+        with c_chart2:
+            st.markdown("#### 💾 Export Translation Transcript")
+            full_sentence = " ".join(st.session_state.accumulated_words)
+            if full_sentence:
+                st.text_area("Full Transcript", value=full_sentence, height=120)
+                audio_bytes = generate_audio_bytes(full_sentence)
+                if audio_bytes:
+                    st.download_button(
+                        label="⬇️ Download Spoken Audio (MP3)",
+                        data=audio_bytes,
+                        file_name="signease_speech.mp3",
+                        mime="audio/mp3",
+                        use_container_width=True,
+                    )
+            else:
+                st.caption("Create a sentence in Tab 1 to download transcript and audio.")
+
+# ─────────────────────────────────────────────────────────────────────
+#  TAB 5 : System Architecture & Technical Research
+# ─────────────────────────────────────────────────────────────────────
+with tab_about:
+    st.markdown(
+        """
+        ### 🏗️ Technical Architecture & Kinematic Principles
+
+        **SignEase AI** operates on a modular, end-to-end Computer Vision & Natural Language Speech synthesis pipeline:
+
+        ```
+        ┌────────────────────────────────────────────────────────┐
+        │            User Browser / Mobile Webcam                │
+        │      Live MediaStream via WebRTC (P2P Audio/Video)     │
+        └──────────────────────────┬─────────────────────────────┘
+                                   │  Continuous 30 FPS Stream
+                                   ▼
+        ┌────────────────────────────────────────────────────────┐
+        │            HandTracker (MediaPipe / CV Hybrid)         │
+        │    Extracts 21 3D Spatial Landmarks (x, y, z)          │
+        │    Skin Tone Invariant · Distance & Scale Normalized   │
+        └──────────────────────────┬─────────────────────────────┘
+                                   │  Normalized Kinematic Coords
+                                   ▼
+        ┌────────────────────────────────────────────────────────┐
+        │             GestureClassifier Kinematic Engine         │
+        │    Vector Geometry · Finger Extension Angle Analysis   │
+        │    Temporal Sliding Window Debouncing & Noise Filter   │
+        └──────────────────────────┬─────────────────────────────┘
+                                   │  Recognized Semantic Token
+                                   ▼
+        ┌────────────────────────────────────────────────────────┐
+        │          SentenceBuilder & Speech Synthesis            │
+        │    Accumulates Words · Client-side Web Speech API      │
+        │    Instant Zero-Latency Audio Output on Device         │
+        └────────────────────────────────────────────────────────┘
+        ```
+
+        ---
+
+        #### 🌟 Key Technical Differentiators for Judges
+
+        1. **Zero-Upload Continuous WebRTC Streaming**: Users do not have to capture or upload files; the stream runs live with augmented HUD overlays.
+        2. **Robust Multi-Platform Fallback**: Seamlessly works with MediaPipe 21-joint skeleton when present, with automatic OpenCV contour/defects fallback.
+        3. **Dual In-Browser & Server Audio Pipeline**: In-browser instant voice synthesis via Web Speech API combined with offline MP3 export via gTTS.
+        4. **Temporal Stability Filtering**: Sliding-window debouncing eliminates single-frame wobbles and ensures high precision.
+
+        ---
+
+        <div style="text-align: center; color: #829AB1; padding: 1rem;">
+            Built with ❤️ for Accessibility & Inclusive Communication · 2026
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
