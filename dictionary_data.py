@@ -148,3 +148,33 @@ SIGN_DICTIONARY: dict[str, SignEntry] = {
     },
     "FIVE (5)": {
         "label": "FIVE (5)",
+        "category": "Numbers",
+        "emoji": "5️⃣",
+        "meaning": "Number 5",
+        "how_to_perform": "Extend all 5 fingers open wide.",
+        "finger_status": "All 5 fingers open wide",
+    },
+    "FIST / ZERO (0)": {
+        "label": "FIST / ZERO (0)",
+        "category": "Numbers",
+        "emoji": "0️⃣",
+        "meaning": "Number 0 or resting state",
+        "how_to_perform": "Close all fingers into a tight fist.",
+        "finger_status": "All 5 fingers curled",
+    },
+}
+
+
+def get_categories() -> list[str]:
+    """Return all unique sign categories in presentation order."""
+    cats = []
+    for entry in SIGN_DICTIONARY.values():
+        c = entry["category"]
+        if c not in cats:
+            cats.append(c)
+    return cats
+
+
+def get_signs_by_category(category: str) -> list[SignEntry]:
+    """Return all entries belonging to a specific category."""
+    return [entry for entry in SIGN_DICTIONARY.values() if entry["category"] == category]
