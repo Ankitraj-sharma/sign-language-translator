@@ -43,3 +43,43 @@ def speak_in_browser(text: str, lang: str = "en-US", rate: float = 1.0) -> None:
 def generate_audio_bytes(text: str, lang: str = "en") -> Optional[bytes]:
     """
     Synthesizes MP3 audio bytes using gTTS for playback/download.
+    """
+    if not text or not text.strip():
+        return None
+
+    try:
+        from gtts import gTTS
+
+        tts = gTTS(text=text, lang=lang, slow=False)
+        buf = io.BytesIO()
+        tts.write_to_fp(buf)
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        return None
+
+
+class SentenceBuilder:
+    """
+    Accumulates recognized gestures into words and full sentences,
+    filtering consecutive duplicates and handling spaces.
+    """
+
+    def __init__(self, debounce_frames: int = 15) -> None:
+        self.debounce_frames = debounce_frames
+        self.current_candidate: str = ""
+        self.candidate_count: int = 0
+        self.words: list[str] = []
+        self.last_spoken: str = ""
+
+    def update(self, detected_gesture: str) -> Optional[str]:
+        """
+        Process a new frame gesture.
+        Returns the committed word/phrase when stability threshold is reached, else None.
+        """
+        if not detected_gesture or detected_gesture == "UNKNOWN":
+            self.current_candidate = ""
+            self.candidate_count = 0
+            return None
+
+        if detected_gesture == self.current_candidate:
