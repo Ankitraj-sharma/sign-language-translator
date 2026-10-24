@@ -83,3 +83,26 @@ class SentenceBuilder:
             return None
 
         if detected_gesture == self.current_candidate:
+            self.candidate_count += 1
+            if self.candidate_count == self.debounce_frames:
+                # Commit sign to words list if not duplicate of last word
+                clean_sign = detected_gesture.split("(")[0].strip()
+                if not self.words or self.words[-1] != clean_sign:
+                    self.words.append(clean_sign)
+                    return clean_sign
+        else:
+            self.current_candidate = detected_gesture
+            self.candidate_count = 1
+
+        return None
+
+    def get_sentence(self) -> str:
+        """Return the accumulated sentence."""
+        return " ".join(self.words)
+
+    def clear(self) -> None:
+        """Clear accumulated sentence and candidate state."""
+        self.words = []
+        self.current_candidate = ""
+        self.candidate_count = 0
+        self.last_spoken = ""
