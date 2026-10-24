@@ -58,3 +58,73 @@ class GestureClassifier:
             "middle": is_extended(12, 10, 9),
             "ring": is_extended(16, 14, 13),
             "pinky": is_extended(20, 18, 17),
+        }
+
+    def classify(self, lms: list[tuple[float, ...]], handedness: str = "Right") -> tuple[str, float]:
+        """
+        Evaluate normalized landmarks and return (gesture_name, confidence).
+        """
+        if len(lms) < 21:
+            return "UNKNOWN", 0.0
+
+        states = self.get_finger_states(lms)
+        thumb = states["thumb"]
+        index = states["index"]
+        middle = states["middle"]
+        ring = states["ring"]
+        pinky = states["pinky"]
+
+        wrist = lms[0]
+        thumb_tip = lms[4]
+        index_tip = lms[8]
+        middle_tip = lms[12]
+        ring_tip = lms[16]
+        pinky_tip = lms[20]
+
+        # Key spatial metrics
+        thumb_index_dist = self._dist(thumb_tip, index_tip)
+        index_middle_dist = self._dist(index_tip, middle_tip)
+        palm_size = self._dist(wrist, lms[9]) + 1e-6  # normalize against hand size
+
+        norm_thumb_index_dist = thumb_index_dist / palm_size
+        norm_index_middle_dist = index_middle_dist / palm_size
+
+        raw_gesture = "UNKNOWN"
+        conf = 0.85
+
+        # 1. OKAY Sign: Thumb and Index tips touch, Middle, Ring, Pinky extended
+        if norm_thumb_index_dist < 0.35 and middle and ring and pinky:
+            raw_gesture = "OKAY"
+            conf = 0.94
+
+        # 2. I LOVE YOU: Thumb, Index, Pinky extended; Middle, Ring curled
+        elif thumb and index and not middle and not ring and pinky:
+            raw_gesture = "I LOVE YOU"
+            conf = 0.96
+
+        # 3. SUPER / CALL ME: Thumb and Pinky extended; Index, Middle, Ring curled
+        elif thumb and not index and not middle and not ring and pinky:
+            raw_gesture = "SUPER / CALL ME"
+            conf = 0.92
+
+        # 4. PEACE / VICTORY: Index and Middle extended in V; Thumb, Ring, Pinky curled
+        elif index and middle and not ring and not pinky:
+            if norm_index_middle_dist > 0.25:
+                raw_gesture = "PEACE / VICTORY"
+                conf = 0.95
+            else:
+                raw_gesture = "TWO (2)"
+                conf = 0.91
+
+        # 5. WATER / 'W' sign: Index, Middle, Ring extended; Thumb and Pinky curled
+        elif not thumb and index and middle and ring and not pinky:
+            raw_gesture = "WATER"
+            conf = 0.91
+
+        # 6. THUMBS UP (YES) or THUMBS DOWN (NO)
+        elif thumb and not index and not middle and not ring and not pinky:
+            # Check thumb direction relative to wrist
+            if thumb_tip[1] < wrist[1] - 0.05:  # thumb pointing upwards
+                raw_gesture = "YES"
+                conf = 0.93
+            elif thumb_tip[1] > wrist[1] + 0.05:  # thumb pointing downwards
