@@ -418,3 +418,48 @@ with tab_snap:
                 # Log into history
                 st.session_state.session_history.append(
                     {"sign": sign, "confidence": conf, "timestamp": time.time()}
+                )
+            else:
+                st.warning("No hand detected in the image. Please ensure the hand is clearly visible.")
+
+# ─────────────────────────────────────────────────────────────────────
+#  TAB 3 : Interactive Sign Dictionary
+# ─────────────────────────────────────────────────────────────────────
+with tab_dict:
+    st.markdown("### 📖 Supported Sign Language Dictionary")
+    st.caption("Browse through the vocabulary of gestures supported by SignEase AI with performance guidelines.")
+
+    categories = get_categories()
+    selected_cat = st.radio("Filter by Category", ["All Categories"] + categories, horizontal=True)
+
+    entries = (
+        list(SIGN_DICTIONARY.values())
+        if selected_cat == "All Categories"
+        else get_signs_by_category(selected_cat)
+    )
+
+    grid_cols = st.columns(3)
+    for idx, entry in enumerate(entries):
+        col = grid_cols[idx % 3]
+        with col:
+            st.markdown(
+                f"""
+                <div class="dict-card">
+                    <div class="dict-emoji">{entry['emoji']}</div>
+                    <div class="dict-name">{entry['label']}</div>
+                    <div style="color: #00D2BA; font-size: 0.8rem; margin-top: 2px;">Category: {entry['category']}</div>
+                    <div class="dict-desc"><b>Meaning:</b> {entry['meaning']}</div>
+                    <div class="dict-desc" style="margin-top: 6px;"><b>How to do:</b> {entry['how_to_perform']}</div>
+                    <div class="dict-desc" style="color: #829AB1; font-size: 0.8rem; margin-top: 4px;"><b>Finger State:</b> {entry['finger_status']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+# ─────────────────────────────────────────────────────────────────────
+#  TAB 4 : Analytics Dashboard
+# ─────────────────────────────────────────────────────────────────────
+with tab_analytics:
+    st.markdown("### 📊 Translation Session Analytics")
+    st.caption("Aggregated frequency and confidence telemetry across this interactive session.")
+
