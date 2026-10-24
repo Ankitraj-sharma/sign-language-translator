@@ -213,3 +213,108 @@ with st.sidebar:
     )
 
     st.markdown("---")
+    st.markdown("### 📈 Session Counters")
+    st.metric("Total Translated Signs", len(st.session_state.session_history))
+    st.metric("Words in Current Sentence", len(st.session_state.accumulated_words))
+
+    st.markdown("---")
+    if st.button("🗑️ Reset Session", use_container_width=True):
+        st.session_state.accumulated_words = []
+        st.session_state.session_history = []
+        st.session_state.last_spoken_text = ""
+        st.rerun()
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Application Tabs
+# ═══════════════════════════════════════════════════════════════════════
+tab_live, tab_snap, tab_dict, tab_analytics, tab_about = st.tabs(
+    [
+        "🔴 Live Webcam Stream",
+        "📸 Snapshot Translation",
+        "📖 Sign Dictionary",
+        "📊 Analytics Dashboard",
+        "ℹ️ System Architecture",
+    ]
+)
+
+# ─────────────────────────────────────────────────────────────────────
+#  TAB 1 : Real-Time Live Webcam Stream (No Upload Needed!)
+# ─────────────────────────────────────────────────────────────────────
+with tab_live:
+    st.markdown("### 🔴 Real-Time Continuous Sign Translator")
+    st.markdown(
+        """
+        <div style="background: rgba(0, 210, 186, 0.08); border-left: 4px solid #00D2BA; padding: 12px 18px; border-radius: 8px; margin-bottom: 20px;">
+            <b style="color: #00D2BA; font-size: 1.05rem;">✨ Continuous Live Video — Zero File Uploads Needed!</b><br>
+            Click <b>START</b> below to open your camera. Make any sign in front of the lens.
+            Hold the sign steady for ~1 second to automatically add it to your sentence and speak it aloud!
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_video, col_hud = st.columns([1.5, 1.0])
+
+    with col_video:
+        ctx = webrtc_streamer(
+            key="signease-live-stream",
+            mode=WebRtcMode.SENDRECV,
+            rtc_configuration=RTC_CONFIGURATION,
+            video_processor_factory=LiveSignProcessor,
+            media_stream_constraints={"video": True, "audio": False},
+            async_processing=True,
+        )
+
+        if ctx.video_processor:
+            ctx.video_processor.hold_threshold = hold_frames
+
+    with col_hud:
+        st.markdown("#### ⚡ Live Recognition Telemetry")
+
+        if ctx.state.playing and ctx.video_processor:
+            telemetry = ctx.video_processor.get_telemetry()
+            current_sign = telemetry["sign"]
+            conf = telemetry["confidence"]
+            fps = telemetry["fps"]
+            committed = telemetry["committed_sign"]
+
+            # Telemetry display
+            entry = SIGN_DICTIONARY.get(current_sign)
+            emoji_icon = entry["emoji"] if entry else "✋"
+
+            st.markdown(
+                f"""
+                <div class="telemetry-card">
+                    <div style="font-size: 2.5rem;">{emoji_icon}</div>
+                    <div class="telemetry-val">{current_sign}</div>
+                    <div class="telemetry-label">Active Detected Gesture</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.plotly_chart(confidence_gauge_chart(conf), use_container_width=True, key="live_gauge")
+
+            st.caption(f"⚡ Processing Stream: **{fps} FPS**")
+
+            # Handle newly committed sign from live stream
+            if committed and committed not in ("NO HAND DETECTED", "UNKNOWN"):
+                clean_word = committed.split("(")[0].strip()
+                if not st.session_state.accumulated_words or st.session_state.accumulated_words[-1] != clean_word:
+                    st.session_state.accumulated_words.append(clean_word)
+                    st.session_state.session_history.append(
+                        {
+                            "sign": clean_word,
+                            "confidence": conf,
+                            "timestamp": time.time(),
+                        }
+                    )
+                    if auto_speak:
+                        speak_in_browser(clean_word, lang=lang_code, rate=speech_rate)
+
+        else:
+            st.markdown(
+                """
+                <div class="telemetry-card">
+                    <div style="font-size: 2.5rem;">📷</div>
+                    <div class="telemetry-val" style="color: #829AB1;">Camera Idle</div>
