@@ -383,3 +383,38 @@ with tab_snap:
         tracker = st.session_state.tracker
         classifier = st.session_state.classifier
 
+        with st.spinner("Analyzing hand landmarks & gesture kinematics..."):
+            annotated_bgr, hands = tracker.process_frame(bgr_frame, draw=True)
+
+        res_col1, res_col2 = st.columns(2)
+        with res_col1:
+            st.markdown("#### 🎯 Landmark Skeleton")
+            st.image(annotated_bgr, channels="BGR", use_container_width=True)
+
+        with res_col2:
+            st.markdown("#### 📋 Kinematic Analysis")
+            if hands and len(hands) > 0:
+                h_data = hands[0]
+                sign, conf = classifier.classify(h_data["landmarks"], handedness=h_data.get("handedness", "Right"))
+                f_states = classifier.get_finger_states(h_data["landmarks"])
+                dict_entry = SIGN_DICTIONARY.get(sign)
+
+                st.success(f"### Recognized: **{sign}** ({int(conf * 100)}% Conf)")
+                if dict_entry:
+                    st.markdown(f"**Meaning:** {dict_entry['meaning']}")
+                    st.markdown(f"**How to perform:** {dict_entry['how_to_perform']}")
+
+                st.markdown("##### 🖐️ Finger Extension States")
+                f_cols = st.columns(5)
+                for i, (fname, is_ext) in enumerate(f_states.items()):
+                    with f_cols[i]:
+                        status_str = "🟢 UP" if is_ext else "🔴 DOWN"
+                        st.metric(fname.capitalize(), status_str)
+
+                # Audio synthesis button
+                if st.button("🔊 Speak this Sign", key="snap_speak"):
+                    speak_in_browser(sign, lang=lang_code, rate=speech_rate)
+
+                # Log into history
+                st.session_state.session_history.append(
+                    {"sign": sign, "confidence": conf, "timestamp": time.time()}
