@@ -158,3 +158,95 @@ class HandTracker:
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 210, 186), 2, cv2.LINE_AA)
 
         # Hand tag
+        tag = f"{handedness} Hand"
+        cv2.putText(
+            img,
+            tag,
+            (x1, max(24, y1 - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 210, 186),
+            2,
+            cv2.LINE_AA,
+        )
+
+    def _fallback_contour_detector(
+        self, frame: np.ndarray, out_frame: np.ndarray, draw: bool
+    ) -> list[dict]:
+        """
+        Lightweight fallback for hand detection using HSV skin thresholding
+        and contour geometry when MediaPipe is building or unavailable.
+        """
+        h, w = frame.shape[:2]
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Skin tone range in HSV
+        lower_skin = np.array([0, 28, 60], dtype=np.uint8)
+        upper_skin = np.array([25, 255, 255], dtype=np.uint8)
+        mask = cv2.inRange(hsv, lower_skin, upper_skin)
+
+        # Morphological filtering
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.dilate(mask, kernel, iterations=2)
+        mask = cv2.GaussianBlur(mask, (5, 5), 100)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return []
+
+        # Find largest contour (likely hand)
+        largest = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(largest)
+        if area < 5000:
+            return []
+
+        x, y, bw, bh = cv2.boundingRect(largest)
+        hull = cv2.convexHull(largest, returnPoints=False)
+        defects = None
+        if len(hull) > 3:
+            try:
+                defects = cv2.convexityDefects(largest, hull)
+            except Exception:
+                defects = None
+
+        # Synthesize approximate 21 landmarks based on contour extrema & center
+        m = cv2.moments(largest)
+        cx = int(m["m10"] / (m["m00"] + 1e-5))
+        cy = int(m["m01"] / (m["m00"] + 1e-5))
+
+        topmost = tuple(largest[largest[:, :, 1].argmin()][0])
+        leftmost = tuple(largest[largest[:, :, 0].argmin()][0])
+        rightmost = tuple(largest[largest[:, :, 0].argmax()][0])
+
+        norm_lms = []
+        pixel_lms = []
+        for i in range(21):
+            # Interpolate pseudo landmarks from wrist (cx, y+bh) to fingertips
+            ratio = (i % 5) / 4.0
+            px = int(cx + (topmost[0] - cx) * ratio + (i - 10) * (bw / 30))
+            py = int((y + bh) - ((y + bh) - topmost[1]) * ratio)
+            px = max(0, min(w - 1, px))
+            py = max(0, min(h - 1, py))
+            pixel_lms.append((px, py))
+            norm_lms.append((px / w, py / h, 0.0))
+
+        if draw:
+            cv2.rectangle(out_frame, (x, y), (x + bw, y + bh), (0, 210, 186), 2)
+            cv2.putText(
+                out_frame,
+                "Hand (CV Track)",
+                (x, max(24, y - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (0, 210, 186),
+                2,
+            )
+
+        return [
+            {
+                "landmarks": norm_lms,
+                "pixel_landmarks": pixel_lms,
+                "handedness": "Right",
+                "bbox": (x, y, x + bw, y + bh),
+            }
+        ]
