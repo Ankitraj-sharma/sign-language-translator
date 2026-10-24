@@ -128,3 +128,88 @@ st.markdown(
         font-size: 2.2rem;
         margin-bottom: 0.3rem;
     }
+    .dict-name {
+        color: #00D2BA;
+        font-size: 1.15rem;
+        font-weight: 700;
+    }
+    .dict-desc {
+        color: #9FB3C8;
+        font-size: 0.9rem;
+        margin-top: 0.3rem;
+    }
+
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Session State Initialization
+# ═══════════════════════════════════════════════════════════════════════
+if "accumulated_words" not in st.session_state:
+    st.session_state.accumulated_words = []
+if "session_history" not in st.session_state:
+    st.session_state.session_history = []
+if "last_spoken_text" not in st.session_state:
+    st.session_state.last_spoken_text = ""
+if "tracker" not in st.session_state:
+    st.session_state.tracker = HandTracker(max_num_hands=1)
+if "classifier" not in st.session_state:
+    st.session_state.classifier = GestureClassifier()
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Hero Header
+# ═══════════════════════════════════════════════════════════════════════
+st.markdown(
+    """
+    <div class="hero-banner">
+        <h1>🤟 SignEase AI — Real-Time Sign Language Translator</h1>
+        <p>Bridging communication barriers with real-time hand kinematics, visual translation,
+        and continuous voice synthesis directly through your browser webcam.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Sidebar Controls
+# ═══════════════════════════════════════════════════════════════════════
+with st.sidebar:
+    st.markdown("## ⚙️ Translation Controls")
+    st.markdown("---")
+
+    voice_lang = st.selectbox(
+        "🗣️ Speech Voice Accent",
+        options=["en-US (US English)", "en-IN (Indian English)", "en-GB (British English)"],
+        index=0,
+        help="Select the accent for in-browser speech synthesis.",
+    )
+    lang_code = voice_lang.split()[0]
+
+    speech_rate = st.slider(
+        "⚡ Speech Speed",
+        min_value=0.7,
+        max_value=1.3,
+        value=1.0,
+        step=0.1,
+        help="Controls the speed of the spoken voice.",
+    )
+
+    auto_speak = st.checkbox(
+        "🔊 Auto-Speak Committed Signs",
+        value=True,
+        help="Automatically speaks each sign aloud as soon as it is held and recognized.",
+    )
+
+    hold_frames = st.slider(
+        "⏱️ Sign Hold Threshold",
+        min_value=8,
+        max_value=25,
+        value=14,
+        help="Frames a sign must be held continuously to commit into the sentence.",
+    )
+
+    st.markdown("---")
