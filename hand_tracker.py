@@ -118,3 +118,43 @@ class HandTracker:
                             "landmarks": norm_coords,
                             "pixel_landmarks": pixel_coords,
                             "handedness": handedness_label,
+                            "bbox": bbox,
+                        }
+                    )
+
+                    if draw:
+                        self._draw_custom_skeleton(annotated, pixel_coords, bbox, handedness_label)
+
+                return annotated, hands_data
+
+        # Fallback: Color-space contour & convexity defects detector
+        hands_data = self._fallback_contour_detector(frame, annotated, draw)
+        return annotated, hands_data if hands_data else None
+
+    def _draw_custom_skeleton(
+        self,
+        img: np.ndarray,
+        pts: list[tuple[int, int]],
+        bbox: tuple[int, int, int, int],
+        handedness: str,
+    ) -> None:
+        """Draw a high-tech cyan/emerald hand skeleton with glowing joints."""
+        # Draw connections
+        for p1, p2 in HAND_CONNECTIONS:
+            cv2.line(img, pts[p1], pts[p2], (0, 210, 186), 3, cv2.LINE_AA)
+            cv2.line(img, pts[p1], pts[p2], (255, 255, 255), 1, cv2.LINE_AA)
+
+        # Draw landmark points
+        for i, (px, py) in enumerate(pts):
+            # Fingertips (4, 8, 12, 16, 20) highlighted in vivid amber
+            if i in (4, 8, 12, 16, 20):
+                cv2.circle(img, (px, py), 7, (0, 165, 255), -1, cv2.LINE_AA)
+                cv2.circle(img, (px, py), 9, (255, 255, 255), 1, cv2.LINE_AA)
+            else:
+                cv2.circle(img, (px, py), 4, (255, 200, 0), -1, cv2.LINE_AA)
+
+        # Bounding box with rounded look
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 210, 186), 2, cv2.LINE_AA)
+
+        # Hand tag
