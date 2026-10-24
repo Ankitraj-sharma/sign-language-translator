@@ -38,3 +38,83 @@ class LiveSignProcessor(VideoProcessorBase):
         self.tracker = HandTracker(max_num_hands=1)
         self.classifier = GestureClassifier(buffer_size=8)
 
+        # Thread synchronization
+        self._lock = threading.Lock()
+        self.latest_sign: str = "Awaiting hand..."
+        self.latest_confidence: float = 0.0
+        self.finger_states: dict[str, bool] = {}
+        self.fps: float = 0.0
+
+        # Frame timing
+        self._last_time = time.time()
+        self._frame_count = 0
+
+        # Sign hold debounce counter for sentence builder
+        self._current_hold_sign = ""
+        self._hold_counter = 0
+        self.newly_committed_sign: Optional[str] = None
+        self.hold_threshold = 15  # frames required to commit a sign
+
+    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+        """Process incoming video frame and return annotated frame."""
+        img = frame.to_ndarray(format="bgr24")
+        h, w = img.shape[:2]
+
+        # Calculate FPS
+        now = time.time()
+        self._frame_count += 1
+        elapsed = now - self._last_time
+        if elapsed >= 1.0:
+            self.fps = round(self._frame_count / elapsed, 1)
+            self._frame_count = 0
+            self._last_time = now
+
+        # Run hand tracking
+        annotated, hands = self.tracker.process_frame(img, draw=True)
+
+        current_sign = "NO HAND DETECTED"
+        current_conf = 0.0
+        f_states = {}
+
+        if hands and len(hands) > 0:
+            primary_hand = hands[0]
+            lms = primary_hand["landmarks"]
+            handedness = primary_hand.get("handedness", "Right")
+
+            f_states = self.classifier.get_finger_states(lms)
+            sign, conf = self.classifier.classify(lms, handedness=handedness)
+            current_sign = sign
+            current_conf = conf
+
+            # Debouncing logic to commit sign
+            if current_sign != "UNKNOWN":
+                if current_sign == self._current_hold_sign:
+                    self._hold_counter += 1
+                    if self._hold_counter == self.hold_threshold:
+                        with self._lock:
+                            self.newly_committed_sign = current_sign
+                else:
+                    self._current_hold_sign = current_sign
+                    self._hold_counter = 1
+            else:
+                self._current_hold_sign = ""
+                self._hold_counter = 0
+
+        # Draw futuristic HUD overlay on the video frame
+        self._draw_hud(annotated, current_sign, current_conf, f_states, w, h)
+
+        # Thread-safe update
+        with self._lock:
+            self.latest_sign = current_sign
+            self.latest_confidence = current_conf
+            self.finger_states = f_states
+
+        return av.VideoFrame.from_ndarray(annotated, format="bgr24")
+
+    def _draw_hud(
+        self,
+        img,
+        sign: str,
+        conf: float,
+        states: dict[str, bool],
+        w: int,
