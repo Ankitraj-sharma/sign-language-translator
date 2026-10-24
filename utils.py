@@ -78,3 +78,48 @@ def confidence_gauge_chart(confidence: float) -> go.Figure:
                     {"range": [50, 75], "color": "rgba(240, 147, 43, 0.25)"},
                     {"range": [75, 100], "color": "rgba(106, 176, 76, 0.25)"},
                 ],
+            },
+        )
+    )
+    fig.update_layout(
+        height=220,
+        margin=dict(l=20, r=20, t=40, b=10),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#E6EDF3"),
+    )
+    return fig
+
+
+def session_metrics(history: list[dict]) -> dict:
+    """Calculate aggregate statistics from translation events."""
+    if not history:
+        return {
+            "total_translations": 0,
+            "unique_signs": 0,
+            "avg_confidence": 0.0,
+            "top_sign": "None",
+        }
+
+    signs = [h["sign"] for h in history if h.get("sign")]
+    confs = [h["confidence"] for h in history if "confidence" in h]
+
+    top_sign = Counter(signs).most_common(1)[0][0] if signs else "None"
+    avg_conf = round(sum(confs) / len(confs) * 100, 1) if confs else 0.0
+
+    return {
+        "total_translations": len(signs),
+        "unique_signs": len(set(signs)),
+        "avg_confidence": avg_conf,
+        "top_sign": top_sign,
+    }
+
+
+def pil_to_cv2(pil_img: Image.Image) -> np.ndarray:
+    """Convert PIL RGB image to OpenCV BGR."""
+    return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+
+
+def cv2_to_pil(cv2_img: np.ndarray) -> Image.Image:
+    """Convert OpenCV BGR image to PIL RGB."""
+    return Image.fromarray(cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB))
