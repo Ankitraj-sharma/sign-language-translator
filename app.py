@@ -318,3 +318,68 @@ with tab_live:
                 <div class="telemetry-card">
                     <div style="font-size: 2.5rem;">📷</div>
                     <div class="telemetry-val" style="color: #829AB1;">Camera Idle</div>
+                    <div class="telemetry-label">Click START on the left to begin streaming</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.plotly_chart(confidence_gauge_chart(0.0), use_container_width=True, key="idle_gauge")
+
+    # ── Sentence Construction Bar ────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 💬 Real-Time Sentence Builder")
+
+    current_sentence = " ".join(st.session_state.accumulated_words)
+    display_sentence = current_sentence if current_sentence else "Awaiting your first sign..."
+
+    st.markdown(
+        f"""
+        <div class="sentence-box">
+            <div class="sentence-label">Translated Spoken Sentence</div>
+            <div class="sentence-text">{display_sentence}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Audio Action Buttons
+    c_speak, c_clear, c_undo = st.columns([1, 1, 1])
+    with c_speak:
+        if st.button("🔊 Speak Full Sentence", use_container_width=True, disabled=not current_sentence):
+            speak_in_browser(current_sentence, lang=lang_code, rate=speech_rate)
+    with c_clear:
+        if st.button("🧹 Clear Sentence", use_container_width=True, disabled=not current_sentence):
+            st.session_state.accumulated_words = []
+            st.rerun()
+    with c_undo:
+        if st.button("⬅️ Undo Last Word", use_container_width=True, disabled=not current_sentence):
+            if st.session_state.accumulated_words:
+                st.session_state.accumulated_words.pop()
+                st.rerun()
+
+# ─────────────────────────────────────────────────────────────────────
+#  TAB 2 : Snapshot & Single Image Mode
+# ─────────────────────────────────────────────────────────────────────
+with tab_snap:
+    st.markdown("### 📸 Snapshot & Image Translation")
+    st.caption("Capture a still photo or upload an image to inspect 21 3D hand joints and semantic translation.")
+
+    col_cam, col_upload = st.columns(2)
+    with col_cam:
+        snap_file = st.camera_input("Take a photo", key="snap_camera")
+    with col_upload:
+        up_file = st.file_uploader(
+            "Or upload an image file",
+            type=["jpg", "jpeg", "png", "webp"],
+            key="snap_upload",
+        )
+
+    target_image = snap_file or up_file
+
+    if target_image is not None:
+        pil_image = Image.open(target_image).convert("RGB")
+        bgr_frame = pil_to_cv2(pil_image)
+
+        tracker = st.session_state.tracker
+        classifier = st.session_state.classifier
+
