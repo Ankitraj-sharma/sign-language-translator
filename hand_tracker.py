@@ -52,6 +52,7 @@ class HandTracker:
         if self.use_mediapipe:
             self.detector = mp_hands.Hands(
                 static_image_mode=False,
+                model_complexity=0,
                 max_num_hands=max_num_hands,
                 min_detection_confidence=min_detection_confidence,
                 min_tracking_confidence=min_tracking_confidence,
